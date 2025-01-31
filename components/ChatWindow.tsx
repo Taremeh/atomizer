@@ -70,7 +70,7 @@ function ScrollToBottom(props: { className?: string }) {
 function ChatInput(props: {
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   loading?: boolean;
   placeholder?: string;
   children?: ReactNode;
@@ -86,11 +86,12 @@ function ChatInput(props: {
       className={cn("flex w-full flex-col", props.className)}
     >
       <div className="border border-input bg-secondary rounded-lg flex flex-col gap-2 max-w-[768px] w-full mx-auto">
-        <input
+        <textarea
           value={props.value}
           placeholder={props.placeholder}
           onChange={props.onChange}
-          className="border-none outline-none bg-transparent p-4"
+          className="border-none outline-none bg-transparent p-4 resize-none"
+          rows={3} // Allows multiline input
         />
 
         <div className="flex justify-between ml-4 mr-2 mb-2">
@@ -111,6 +112,7 @@ function ChatInput(props: {
     </form>
   );
 }
+
 
 function StickyToBottomContent(props: {
   content: ReactNode;
