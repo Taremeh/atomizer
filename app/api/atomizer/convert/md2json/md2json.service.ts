@@ -20,7 +20,7 @@ Some second level text
 
 // console.log(JSON.stringify(parseMarkdown(markdown), null, 2));
 
-export function parseMarkdown(markdown: string): MarkdownNode[] {
+export function convertMarkdownToJson(markdown: string): MarkdownNode[] {
   const lines = markdown.split('\n');
   const root: MarkdownNode[] = [];
   const stack: MarkdownNode[] = [];
