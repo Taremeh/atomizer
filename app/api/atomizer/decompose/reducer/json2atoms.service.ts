@@ -1,18 +1,6 @@
-// Original interface for Markdown nodes.
-interface MarkdownNode {
-  id: string;
-  type: string;
-  content: string;
-  children: MarkdownNode[];
-}
+import { IAtom } from "../../models/atom.model";
+import { INode } from "../../models/node.model";
 
-// New interface representing a single flattened node ("atom").
-// It includes all properties of a MarkdownNode except for the children.
-export interface MarkdownAtom {
-  id: string;
-  type: string;
-  content: string;
-}
 
 /**
  * Recursively traverses a MarkdownNode tree and returns a flat array of objects,
@@ -21,11 +9,11 @@ export interface MarkdownAtom {
  * @param nodes - The array of MarkdownNode objects (a tree structure) to flatten.
  * @returns A flat array (1d list) of MarkdownAtom objects.
  */
-export function flattenJsonToAtoms(nodes: MarkdownNode[]): MarkdownAtom[] {
-  const atoms: MarkdownAtom[] = [];
+export function reduceJsonToAtoms(nodes: INode[]): IAtom[] {
+  const atoms: IAtom[] = [];
 
   // Helper function to traverse the tree.
-  function traverse(node: MarkdownNode) {
+  function traverse(node: INode) {
     // Extract the properties we want from the node (ignoring children)
     const { id, type, content } = node;
     atoms.push({ id, type, content });

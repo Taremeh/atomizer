@@ -1,6 +1,6 @@
 // Context Interface
 export interface IContext {
   id: string;
-  onwer?: string;
+  owner?: string;
   children: { id: string }[];
 }

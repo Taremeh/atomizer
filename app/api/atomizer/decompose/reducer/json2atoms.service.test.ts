@@ -1,22 +1,16 @@
-import { flattenJsonToAtoms, MarkdownAtom } from './json2atoms.service'; // adjust the path accordingly
+import { INode } from '../../models/node.model';
+import { reduceJsonToAtoms } from './json2atoms.service';
+import { IAtom } from '../../models/atom.model';
 
-// The MarkdownNode interface should be available for constructing test data.
-interface MarkdownNode {
-  id: string;
-  type: string;
-  content: string;
-  children: MarkdownNode[];
-}
-
-describe('flattenJsonToAtoms', () => {
+describe('reduceJsonToAtoms', () => {
   it('should return an empty array when input is empty', () => {
-    const input: MarkdownNode[] = [];
-    const result = flattenJsonToAtoms(input);
+    const input: INode[] = [];
+    const result = reduceJsonToAtoms(input);
     expect(result).toEqual([]);
   });
 
   it('should flatten a single node with no children', () => {
-    const input: MarkdownNode[] = [
+    const input: INode[] = [
       {
         id: '1',
         type: 'p',
@@ -24,8 +18,8 @@ describe('flattenJsonToAtoms', () => {
         children: []
       }
     ];
-    const result = flattenJsonToAtoms(input);
-    const expected: MarkdownAtom[] = [
+    const result = reduceJsonToAtoms(input);
+    const expected: IAtom[] = [
       { id: '1', type: 'p', content: 'Only node' }
     ];
     expect(result).toEqual(expected);
@@ -36,7 +30,7 @@ describe('flattenJsonToAtoms', () => {
     // A
     // ├─ B
     // └─ C
-    const input: MarkdownNode[] = [
+    const input: INode[] = [
       {
         id: 'A',
         type: 'h1',
@@ -59,13 +53,13 @@ describe('flattenJsonToAtoms', () => {
     ];
 
     // The expected flattened order is: [A, B, C]
-    const expected: MarkdownAtom[] = [
+    const expected: IAtom[] = [
       { id: 'A', type: 'h1', content: 'Heading A' },
       { id: 'B', type: 'p', content: 'Paragraph B' },
       { id: 'C', type: 'p', content: 'Paragraph C' }
     ];
 
-    expect(flattenJsonToAtoms(input)).toEqual(expected);
+    expect(reduceJsonToAtoms(input)).toEqual(expected);
   });
 
   it('should flatten a tree with multiple levels of nesting', () => {
@@ -75,7 +69,7 @@ describe('flattenJsonToAtoms', () => {
     // │   ├─ D
     // │   └─ E
     // └─ C
-    const input: MarkdownNode[] = [
+    const input: INode[] = [
       {
         id: 'A',
         type: 'h1',
@@ -111,7 +105,7 @@ describe('flattenJsonToAtoms', () => {
     ];
 
     // Expected flattening order (pre-order traversal): [A, B, D, E, C]
-    const expected: MarkdownAtom[] = [
+    const expected: IAtom[] = [
       { id: 'A', type: 'h1', content: 'Heading A' },
       { id: 'B', type: 'h2', content: 'Heading B' },
       { id: 'D', type: 'p', content: 'Paragraph D' },
@@ -119,7 +113,7 @@ describe('flattenJsonToAtoms', () => {
       { id: 'C', type: 'h2', content: 'Heading C' }
     ];
 
-    expect(flattenJsonToAtoms(input)).toEqual(expected);
+    expect(reduceJsonToAtoms(input)).toEqual(expected);
   });
 
   it('should flatten a complex tree correctly', () => {
@@ -129,7 +123,7 @@ describe('flattenJsonToAtoms', () => {
     // │   └─ Grandchild1
     // └─ Child2
     // Root2 (no children)
-    const input: MarkdownNode[] = [
+    const input: INode[] = [
       {
         id: 'Root1',
         type: 'h1',
@@ -165,7 +159,7 @@ describe('flattenJsonToAtoms', () => {
     ];
 
     // Expected pre-order flattening: [Root1, Child1, Grandchild1, Child2, Root2]
-    const expected: MarkdownAtom[] = [
+    const expected: IAtom[] = [
       { id: 'Root1', type: 'h1', content: 'Root Heading 1' },
       { id: 'Child1', type: 'h2', content: 'Child Heading 1' },
       { id: 'Grandchild1', type: 'p', content: 'Grandchild Paragraph 1' },
@@ -173,6 +167,6 @@ describe('flattenJsonToAtoms', () => {
       { id: 'Root2', type: 'h1', content: 'Root Heading 2' }
     ];
 
-    expect(flattenJsonToAtoms(input)).toEqual(expected);
+    expect(reduceJsonToAtoms(input)).toEqual(expected);
   });
 });

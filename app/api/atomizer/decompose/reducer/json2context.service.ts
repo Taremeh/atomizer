@@ -1,12 +1,5 @@
+import { INode } from "../../models/node.model";
 import { IContext } from "../../models/context.model";
-
-// Original interface for Markdown nodes.
-interface MarkdownNode {
-  id: string;
-  type: string;
-  content: string;
-  children: MarkdownNode[];
-}
 
 /**
  * Traverses the MarkdownNode tree and returns an array of FlattenedNode objects.
@@ -16,10 +9,10 @@ interface MarkdownNode {
  * @param nodes - An array of MarkdownNode objects representing the tree.
  * @returns An array of FlattenedNode objects that have non-empty children arrays.
  */
-export function reduceJsonToContext(nodes: MarkdownNode[]): IContext[] {
+export function reduceJsonToContext(nodes: INode[]): IContext[] {
   const result: IContext[] = [];
 
-  function traverse(node: MarkdownNode) {
+  function traverse(node: INode) {
     // Create the flattened node containing only the id and immediate children (by id)
     const flattened: IContext = {
       id: node.id,
