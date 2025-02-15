@@ -72,7 +72,9 @@ export default function RootLayout({
               {/* </a> */}
               <nav className="flex gap-1 flex-col md:flex-row">
                 <ActiveLink href="/">🏴‍☠️ Chat</ActiveLink>
-                <ActiveLink href="/structured_output">
+                <ActiveLink href="/persist">A-Persist</ActiveLink>
+                <ActiveLink href="/retrieve">A-Retrieve</ActiveLink>
+                {/* <ActiveLink href="/structured_output">
                   🧱 Structured Output
                 </ActiveLink>
                 <ActiveLink href="/agents">🦜 Agents</ActiveLink>
@@ -82,7 +84,7 @@ export default function RootLayout({
                 </ActiveLink>
                 <ActiveLink href="/ai_sdk">
                   🌊 LangChain x AI SDK RSC
-                </ActiveLink>
+                </ActiveLink> */}
               </nav>
             </div>
 
