@@ -90,4 +90,45 @@ describe("Markdown to JSON Parser", () => {
       },
     ]);
   });
+
+  test("parses nested list items correctly", () => {
+    const markdown = `- Item 1
+- Item 2
+  - Item 2.1
+  - Item 2.2
+- Item 3`;
+    const result = convertMarkdownToJson(markdown);
+    
+    // Expected structure:
+    // A top-level ul with three li items.
+    // The second li ("Item 2") contains a nested ul with two li items ("Item 2.1" and "Item 2.2").
+    const expected = [
+      {
+        id: expect.any(String),
+        type: "ul",
+        content: "",
+        children: [
+          { id: expect.any(String), type: "li", content: "Item 1", children: [] },
+          { 
+            id: expect.any(String), 
+            type: "li", 
+            content: "Item 2", 
+            children: [
+              {
+                id: expect.any(String),
+                type: "ul",
+                content: "",
+                children: [
+                  { id: expect.any(String), type: "li", content: "Item 2.1", children: [] },
+                  { id: expect.any(String), type: "li", content: "Item 2.2", children: [] },
+                ],
+              },
+            ],
+          },
+          { id: expect.any(String), type: "li", content: "Item 3", children: [] },
+        ],
+      },
+    ];
+    expect(result).toEqual(expected);
+  });
 });

@@ -1,29 +1,37 @@
+// md2json.service.ts
+
 import { v4 as uuidv4 } from 'uuid';
 
-interface MarkdownNode {
+export interface MarkdownNode {
   id: string;
   type: string;
   content: string;
   children: MarkdownNode[];
 }
 
-
-// Example Usage
-const markdown_example = `
-# Heading Title Level 1
-Some text here
-## Heading Title Level 2
-Some second level text
-- List item 1
-- List item 2
-`;
-
-// console.log(JSON.stringify(parseMarkdown(markdown), null, 2));
-
+/**
+ * Converts a Markdown string into a JSON tree of MarkdownNodes.
+ * This implementation nests headings (and their following content) according
+ * to heading levels. It also supports lists (and nested list items based on indent).
+ *
+ * For example, given:
+ *
+ *   # Heading 1
+ *   ## Heading 2
+ *   Some text
+ *
+ * "Heading 2" (with its text) will be nested under "Heading 1".
+ *
+ * @param markdown The markdown string.
+ * @returns An array of MarkdownNodes representing the markdown structure.
+ */
 export function convertMarkdownToJson(markdown: string): MarkdownNode[] {
   const lines = markdown.split('\n');
   const root: MarkdownNode[] = [];
-  const stack: MarkdownNode[] = [];
+  // Stack to manage nested lists.
+  const listStack: { node: MarkdownNode; indent: number }[] = [];
+  // Stack to manage nested headings.
+  const headingStack: { node: MarkdownNode; level: number }[] = [];
 
   function createNode(type: string, content: string): MarkdownNode {
     return { id: uuidv4(), type, content, children: [] };
@@ -33,66 +41,113 @@ export function convertMarkdownToJson(markdown: string): MarkdownNode[] {
     return line.match(/^#+/)?.[0].length || 0;
   }
 
-  function processListItem(line: string): MarkdownNode {
-    return createNode('li', line.replace(/^[-*] /, '').trim());
-  }
-
-  function processParagraphOrText(line: string): MarkdownNode {
-    return createNode('p', line.trim());
-  }
-
   for (const line of lines) {
     if (!line.trim()) continue; // Skip empty lines
 
-    if (/^#+ /.test(line)) { // Check if line is a heading
+    // Process headings.
+    if (/^#+ /.test(line)) {
+      // End any in-progress list.
+      listStack.length = 0;
       const level = getHeadingLevel(line);
       const headingNode = createNode(`h${level}`, line.replace(/^#+ /, '').trim());
       
-      // Remove elements from stack if they are of equal or greater heading level
-      while (stack.length > 0 && getHeadingLevel(stack[stack.length - 1].content) >= level) {
-        stack.pop();
+      // Pop headings until the top has a lower level than the current heading.
+      while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= level) {
+        headingStack.pop();
       }
-      
-      // If stack is not empty, add heading as a child of last element
-      if (level === 1) { // Always push h1 headings to the root level
+      if (headingStack.length > 0) {
+        // Nest the heading as a child of the last heading.
+        headingStack[headingStack.length - 1].node.children.push(headingNode);
+      } else {
+        // Otherwise, add at the root.
         root.push(headingNode);
-        stack.length = 0; // Reset the stack so new h1 starts fresh
-      } else {
-        if (stack.length > 0) {
-          stack[stack.length - 1].children.push(headingNode);
-        } else {
-          root.push(headingNode);
-        }
       }
-      
+      // Push the new heading onto the heading stack.
+      headingStack.push({ node: headingNode, level });
+      continue;
+    }
 
-      stack.push(headingNode); // Push heading to stack to track hierarchy
-    } else if (/^[-*] /.test(line)) { // Check if line is a list item
-      const listItem = processListItem(line);
-      if (stack.length > 0 && stack[stack.length - 1].type === 'ul') {
-        // If last element in stack is a list, add item to it
-        stack[stack.length - 1].children.push(listItem);
-      } else {
-        // Otherwise, create a new list and add item
-        const listNode = createNode('ul', '');
-        listNode.children.push(listItem);
-        if (stack.length > 0) {
-          stack[stack.length - 1].children.push(listNode);
+    // Process list items.
+    if (/^\s*[-*] /.test(line)) {
+      const indentMatch = line.match(/^(\s*)[-*] /);
+      const indent = indentMatch ? indentMatch[1].length : 0;
+      const content = line.replace(/^\s*[-*] /, '').trim();
+      const listItem = createNode('li', content);
+
+      if (listStack.length === 0) {
+        // Create a new list if none is in progress.
+        const ulNode = createNode('ul', '');
+        ulNode.children.push(listItem);
+        // Add to the last heading's children if exists; otherwise, at the root.
+        if (headingStack.length > 0) {
+          headingStack[headingStack.length - 1].node.children.push(ulNode);
         } else {
-          root.push(listNode);
+          root.push(ulNode);
         }
-        stack.push(listNode); // Push new list to stack
-      }
-    } else { // Process paragraphs and regular text
-      const paragraphNode = processParagraphOrText(line);
-      if (stack.length > 0) {
-        stack[stack.length - 1].children.push(paragraphNode);
+        listStack.push({ node: ulNode, indent });
       } else {
-        root.push(paragraphNode);
+        const lastEntry = listStack[listStack.length - 1];
+        if (indent > lastEntry.indent) {
+          // More indented: create a nested list.
+          const ulNode = createNode('ul', '');
+          // Attach to the last list item.
+          const parentLi = lastEntry.node.children[lastEntry.node.children.length - 1];
+          if (parentLi) {
+            parentLi.children.push(ulNode);
+          } else {
+            lastEntry.node.children.push(ulNode);
+          }
+          ulNode.children.push(listItem);
+          listStack.push({ node: ulNode, indent });
+        } else if (indent === lastEntry.indent) {
+          // Same level: add to the current list.
+          lastEntry.node.children.push(listItem);
+        } else {
+          // Less indented: pop until matching level is found.
+          while (listStack.length > 0 && indent < listStack[listStack.length - 1].indent) {
+            listStack.pop();
+          }
+          if (listStack.length === 0) {
+            const ulNode = createNode('ul', '');
+            ulNode.children.push(listItem);
+            if (headingStack.length > 0) {
+              headingStack[headingStack.length - 1].node.children.push(ulNode);
+            } else {
+              root.push(ulNode);
+            }
+            listStack.push({ node: ulNode, indent });
+          } else {
+            const current = listStack[listStack.length - 1];
+            if (indent === current.indent) {
+              current.node.children.push(listItem);
+            } else {
+              const ulNode = createNode('ul', '');
+              const parentLi = current.node.children[current.node.children.length - 1];
+              if (parentLi) {
+                parentLi.children.push(ulNode);
+              } else {
+                current.node.children.push(ulNode);
+              }
+              ulNode.children.push(listItem);
+              listStack.push({ node: ulNode, indent });
+            }
+          }
+        }
       }
+      continue;
+    }
+
+    // Process paragraphs or regular text.
+    // End any in-progress list.
+    listStack.length = 0;
+    const paragraphNode = createNode('p', line.trim());
+    // If there's an active heading, nest the paragraph under it.
+    if (headingStack.length > 0) {
+      headingStack[headingStack.length - 1].node.children.push(paragraphNode);
+    } else {
+      root.push(paragraphNode);
     }
   }
-  
-  return root;
 
+  return root;
 }
