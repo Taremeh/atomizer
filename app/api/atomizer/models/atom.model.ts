@@ -4,4 +4,6 @@ export interface IAtom {
   id: string;
   type: string;
   content: string;
+  embedding?: number[];
+  created_at?: string;
 }
