@@ -45,15 +45,19 @@ type Row = {
   content: unknown
 }
 
-const QUEUE_NAME = 'embedding_jobs'
+const QUEUE_NAME = 'atom_embedding_jobs'
 
 // Listen for HTTP requests
 Deno.serve(async (req) => {
+  console.log('Received new request:', req.method, req.url)
+
   if (req.method !== 'POST') {
+    console.error('Request rejected - method not allowed:', req.method)
     return new Response('expected POST request', { status: 405 })
   }
 
   if (req.headers.get('content-type') !== 'application/json') {
+    console.error('Request rejected - invalid content type:', req.headers.get('content-type'))
     return new Response('expected json body', { status: 400 })
   }
 
@@ -61,12 +65,14 @@ Deno.serve(async (req) => {
   const parseResult = z.array(jobSchema).safeParse(await req.json())
 
   if (parseResult.error) {
+    console.error('Request body validation failed:', parseResult.error.message)
     return new Response(`invalid request body: ${parseResult.error.message}`, {
       status: 400,
     })
   }
 
   const pendingJobs = parseResult.data
+  console.log(`Received ${pendingJobs.length} job(s) to process`)
 
   // Track jobs that completed successfully
   const completedJobs: Job[] = []
@@ -78,10 +84,13 @@ Deno.serve(async (req) => {
     let currentJob: Job | undefined
 
     while ((currentJob = pendingJobs.shift()) !== undefined) {
+      console.log(`Starting processing for jobId=${currentJob.jobId}, id=${currentJob.id}`)
       try {
         await processJob(currentJob)
+        console.log(`Job processed successfully: jobId=${currentJob.jobId}`)
         completedJobs.push(currentJob)
       } catch (error) {
+        console.error(`Job failed: jobId=${currentJob.jobId}`, error)
         failedJobs.push({
           ...currentJob,
           error: error instanceof Error ? error.message : JSON.stringify(error),
@@ -94,6 +103,7 @@ Deno.serve(async (req) => {
     // Process jobs while listening for worker termination
     await Promise.race([processJobs(), catchUnload()])
   } catch (error) {
+    console.error('Worker termination encountered, failing remaining jobs:', error)
     // If the worker is terminating (e.g. wall clock limit reached),
     // add pending jobs to fail list with termination reason
     failedJobs.push(
@@ -104,8 +114,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  // Log completed and failed jobs for traceability
-  console.log('finished processing jobs:', {
+  console.log('Finished processing jobs:', {
     completedJobs: completedJobs.length,
     failedJobs: failedJobs.length,
   })
@@ -133,6 +142,7 @@ Deno.serve(async (req) => {
  * Generates an embedding for the given text.
  */
 async function generateEmbedding(text: string) {
+  console.log(`Requesting embedding for text (length=${text.length})`)
   const response = await openai.embeddings.create({
     model: 'text-embedding-3-small',
     input: text,
@@ -140,9 +150,11 @@ async function generateEmbedding(text: string) {
   const [data] = response.data
 
   if (!data) {
+    console.error('Failed to generate embedding: no data returned')
     throw new Error('failed to generate embedding')
   }
 
+  console.log(`Received embedding (length=${data.embedding.length})`)
   return data.embedding
 }
 
@@ -151,8 +163,10 @@ async function generateEmbedding(text: string) {
  */
 async function processJob(job: Job) {
   const { jobId, id, schema, table, contentFunction, embeddingColumn } = job
+  console.log(`Processing job: jobId=${jobId}, id=${id}`)
 
   // Fetch content for the schema/table/row combination
+  console.log(`Fetching content from ${schema}.${table} for row id=${id} using function ${contentFunction}`)
   const [row]: [Row] = await sql`
     select
       id,
@@ -164,15 +178,21 @@ async function processJob(job: Job) {
   `
 
   if (!row) {
+    console.error(`Row not found: ${schema}.${table}/${id}`)
     throw new Error(`row not found: ${schema}.${table}/${id}`)
   }
 
+  console.log(`Fetched row id=${row.id}. Validating content type...`)
   if (typeof row.content !== 'string') {
+    console.error(`Invalid content type for row: ${schema}.${table}/${id}`)
     throw new Error(`invalid content - expected string: ${schema}.${table}/${id}`)
   }
 
+  console.log(`Generating embedding for jobId=${jobId}`)
   const embedding = await generateEmbedding(row.content)
+  console.log(`Embedding generated for jobId=${jobId}`)
 
+  console.log(`Updating row in database for jobId=${jobId}`)
   await sql`
     update
       ${sql(schema)}.${sql(table)}
@@ -181,18 +201,22 @@ async function processJob(job: Job) {
     where
       id = ${id}
   `
+  console.log(`Database update complete for jobId=${jobId}`)
 
+  console.log(`Deleting job from queue for jobId=${jobId}`)
   await sql`
     select pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)
   `
+  console.log(`Job deleted from queue for jobId=${jobId}`)
 }
 
 /**
  * Returns a promise that rejects if the worker is terminating.
  */
 function catchUnload() {
-  return new Promise((reject) => {
+  return new Promise((_, reject) => {
     addEventListener('beforeunload', (ev: any) => {
+      console.warn(`Worker termination event received: ${ev.detail?.reason}`)
       reject(new Error(ev.detail?.reason))
     })
   })
